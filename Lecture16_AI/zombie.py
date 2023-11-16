@@ -127,7 +127,7 @@ class Zombie:
             return BehaviorTree.FAIL
 
     def is_zombie_having_more_balls(self):
-        if play_mode.boy.ball_count < self.ball_count:
+        if play_mode.boy.ball_count <= self.ball_count:
             return BehaviorTree.SUCCESS
         else:
             return BehaviorTree.FAIL
@@ -147,7 +147,7 @@ class Zombie:
         run_away_y = self.y + 7 * math.sin(math.atan2(self.y - play_mode.boy.y, self.x - play_mode.boy.x))
 
         self.move_slightly_to(run_away_x, run_away_y)
-        if self.distance_less_than(play_mode.boy.x, play_mode.boy.y, self.x, self.y, r):
+        if self.distance_more_than(play_mode.boy.x, play_mode.boy.y, self.x, self.y, r):
             return BehaviorTree.RUNNING
         else:
             return BehaviorTree.SUCCESS
@@ -178,9 +178,9 @@ class Zombie:
         SEQ_chase_boy = Sequence('소년을 추적', c1, c3, a4)
         SEQ_run_from_boy = Sequence('소년으로부터 도망', c1, c2, a6)
 
-        root = SEL_runaway_or_chase = Selector('도망 또는 추적', SEQ_chase_boy, SEQ_run_from_boy)
+        SEL_runaway_or_chase = Selector('도망 또는 추적', SEQ_chase_boy, SEQ_run_from_boy)
 
-        SEQ_in_or_out = Selector('배회 또는 추적/도망', SEQ_wander, SEL_runaway_or_chase)
+        root = SEL_wander_or_move = Selector('배회 또는 추적/도망', SEQ_wander, SEL_runaway_or_chase)
 
         a5 = Action('순찰 위치 가져오기', self.get_patrol_location)
 
