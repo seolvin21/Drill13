@@ -4,6 +4,7 @@ import random
 import math
 import game_framework
 import game_world
+import boy
 from behavior_tree import BehaviorTree, Action, Sequence, Condition, Selector
 import play_mode
 
@@ -90,6 +91,10 @@ class Zombie:
         distance2 = (x1-x2)**2 + (y1-y2)**2
         return distance2 < (r * PIXEL_PER_METER) ** 2
 
+    def distance_more_than(self, x1, y1, x2, y2, r):
+        distance2 = (x1-x2)**2 + (y1-y2)**2
+        return distance2 > (r * PIXEL_PER_METER) ** 2
+
     def move_slightly_to(self, tx, ty):
         self.dir = math.atan2(ty-self.y, tx-self.x)
         self.speed = RUN_SPEED_PPS
@@ -115,6 +120,18 @@ class Zombie:
         else:
             return BehaviorTree.FAIL
 
+    def is_boy_having_more_balls(self):
+        if play_mode.boy.ball_count > self.ball_count:
+            return BehaviorTree.SUCCESS
+        else:
+            return BehaviorTree.FAIL
+
+    def is_zombie_having_more_balls(self):
+        if play_mode.boy.ball_count < self.ball_count:
+            return BehaviorTree.SUCCESS
+        else:
+            return BehaviorTree.FAIL
+
     def move_to_boy(self, r=0.5):
         self.state = 'Walk'
         self.move_slightly_to(play_mode.boy.x, play_mode.boy.y)
@@ -122,6 +139,18 @@ class Zombie:
             return BehaviorTree.SUCCESS
         else:
             return BehaviorTree.RUNNING
+
+    def move_from_boy(self, r=0.5):
+        self.state = 'Walk'
+
+        run_away_x = self.x + 7 * math.cos(math.atan2(self.y - play_mode.boy.y, self.x - play_mode.boy.x))
+        run_away_y = self.y + 7 * math.sin(math.atan2(self.y - play_mode.boy.y, self.x - play_mode.boy.x))
+
+        self.move_slightly_to(run_away_x, run_away_y)
+        if self.distance_less_than(play_mode.boy.x, play_mode.boy.y, self.x, self.y, r):
+            return BehaviorTree.RUNNING
+        else:
+            return BehaviorTree.SUCCESS
 
     def get_patrol_location(self):
         self.tx, self.ty = self.patrol_location[self.loc_no]
@@ -139,13 +168,19 @@ class Zombie:
         SEQ_wander = Sequence('Wander', a3, a2)
 
         c1 = Condition('소년이 근처에 있는가', self.is_boy_nearby, 7)    # 소년이 7미터 근처에 있는가
+
+        c2 = Condition('소년의 공 개수가 더 많은가', self.is_boy_having_more_balls)
+        c3 = Condition('좀비의 공 개수가 더 많은가', self.is_zombie_having_more_balls)
+
         a4 = Action('소년으로 이동', self.move_to_boy)
+        a6 = Action('소년의 7미터 범위 바깥으로 이동', self.move_from_boy)
 
-        SEQ_chase_boy = Sequence('소년을 추적', c1, a4)
-        
+        SEQ_chase_boy = Sequence('소년을 추적', c1, c3, a4)
+        SEQ_run_from_boy = Sequence('소년으로부터 도망', c1, c2, a6)
 
+        root = SEL_runaway_or_chase = Selector('도망 또는 추적', SEQ_chase_boy, SEQ_run_from_boy)
 
-        root = SEL_chase_or_wander = Selector('추적 또는 배회', SEQ_chase_boy, SEQ_wander)
+        SEQ_in_or_out = Selector('배회 또는 추적/도망', SEQ_wander, SEL_runaway_or_chase)
 
         a5 = Action('순찰 위치 가져오기', self.get_patrol_location)
 
